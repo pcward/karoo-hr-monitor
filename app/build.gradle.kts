@@ -9,7 +9,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "io.github.mirml.karoohrmonitor"
+        applicationId = "io.github.pcward.karoohrmonitor"
         minSdk = 23
         targetSdk = 34
         versionCode = 30

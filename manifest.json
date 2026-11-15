@@ -1,6 +1,6 @@
 {
   "label": "HR Monitor",
-  "packageName": "io.github.mirml.karoohrmonitor",
+  "packageName": "io.github.pcward.karoohrmonitor",
   "iconUrl": "https://raw.githubusercontent.com/mirml/karoo-hr-monitor/main/icon.webp",
   "latestApkUrl": "https://github.com/mirml/karoo-hr-monitor/releases/download/v0.2.0/app-debug.apk",
   "latestVersion": "0.2.0",
