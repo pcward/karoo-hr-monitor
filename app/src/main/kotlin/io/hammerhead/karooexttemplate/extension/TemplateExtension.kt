@@ -14,8 +14,12 @@ class TemplateExtension : KarooExtension("karoo-hr-monitor", "1.0") {
     private val heartRateGraphicDataType =
         HeartRateGraphicDataType("karoo-hr-monitor")
 
+    private val powerGraphicDataType =
+        PowerGraphicDataType("karoo-hr-monitor")
+
     override val types = listOf(
-        heartRateGraphicDataType
+        heartRateGraphicDataType,
+        powerGraphicDataType
     )
 
     private var karooSystemService: KarooSystemService? = null
@@ -28,6 +32,13 @@ class TemplateExtension : KarooExtension("karoo-hr-monitor", "1.0") {
 
     private var averageHeartRate: Double? = null
     private var maximumHeartRate: Double? = null
+
+    private var powerConsumerId: String? = null
+    private var averagePowerConsumerId: String? = null
+    private var normalizedPowerConsumerId: String? = null
+
+    private var averagePower: Double? = null
+    private var normalizedPower: Double? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -47,6 +58,7 @@ class TemplateExtension : KarooExtension("karoo-hr-monitor", "1.0") {
                         is RideState.Idle -> {
                             Log.d(LOG_TAG, "HR Extension: activity is idle")
                             resetHeartRateStats()
+                            resetPowerStats()
                         }
 
                         is RideState.Recording -> {
@@ -154,9 +166,61 @@ class TemplateExtension : KarooExtension("karoo-hr-monitor", "1.0") {
                     heartRateGraphicDataType.updateZones(
                         profile.heartRateZones
                     )
+
+                    powerGraphicDataType.updateZones(
+                        profile.powerZones
+                    )
                 }
 
                 Log.d(LOG_TAG, "HR Extension: profile subscription registered")
+
+                // Monitor 3s smoothed power (1s power is too jumpy to read).
+                powerConsumerId = service.addConsumer<OnStreamState>(
+                    OnStreamState.StartStreaming(
+                        DataType.Type.SMOOTHED_3S_AVERAGE_POWER
+                    )
+                ) { event ->
+                    val state = event.state
+                    if (state is StreamState.Streaming) {
+                        state.dataPoint.values[
+                            DataType.Field.SMOOTHED_3S_AVERAGE_POWER
+                        ]?.let { powerGraphicDataType.updatePower(it) }
+                    } else {
+                        Log.d(LOG_TAG, "Power Extension: 3s power $state")
+                    }
+                }
+
+                // Average power for the ride.
+                averagePowerConsumerId = service.addConsumer<OnStreamState>(
+                    OnStreamState.StartStreaming(DataType.Type.AVERAGE_POWER)
+                ) { event ->
+                    val state = event.state
+                    if (state is StreamState.Streaming) {
+                        averagePower = state.dataPoint.values[
+                            DataType.Field.AVERAGE_POWER
+                        ]
+                        updatePowerStats()
+                    } else {
+                        Log.d(LOG_TAG, "Power Extension: average power $state")
+                    }
+                }
+
+                // Normalized power for the ride.
+                normalizedPowerConsumerId = service.addConsumer<OnStreamState>(
+                    OnStreamState.StartStreaming(DataType.Type.NORMALIZED_POWER)
+                ) { event ->
+                    val state = event.state
+                    if (state is StreamState.Streaming) {
+                        normalizedPower = state.dataPoint.values[
+                            DataType.Field.NORMALIZED_POWER
+                        ]
+                        updatePowerStats()
+                    } else {
+                        Log.d(LOG_TAG, "Power Extension: normalized power $state")
+                    }
+                }
+
+                Log.d(LOG_TAG, "Power Extension: power subscriptions registered")
 
             } else {
                 Log.e(LOG_TAG, "HR Extension: connection failed")
@@ -183,6 +247,25 @@ class TemplateExtension : KarooExtension("karoo-hr-monitor", "1.0") {
         Log.d(LOG_TAG, "HR Extension: HR statistics reset")
     }
 
+    private fun updatePowerStats() {
+        powerGraphicDataType.updatePowerStats(
+            average = averagePower,
+            normalized = normalizedPower
+        )
+    }
+
+    private fun resetPowerStats() {
+        averagePower = null
+        normalizedPower = null
+
+        powerGraphicDataType.updatePowerStats(
+            average = null,
+            normalized = null
+        )
+
+        Log.d(LOG_TAG, "Power Extension: power statistics reset")
+    }
+
     override fun onDestroy() {
         Log.d(LOG_TAG, "HR Extension: stopping extension")
 
@@ -205,6 +288,12 @@ class TemplateExtension : KarooExtension("karoo-hr-monitor", "1.0") {
         rideStateConsumerId?.let {
             karooSystemService?.removeConsumer(it)
         }
+
+        listOfNotNull(
+            powerConsumerId,
+            averagePowerConsumerId,
+            normalizedPowerConsumerId
+        ).forEach { karooSystemService?.removeConsumer(it) }
 
         karooSystemService?.disconnect()
         karooSystemService = null

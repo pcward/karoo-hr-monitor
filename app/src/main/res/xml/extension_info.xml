@@ -12,4 +12,11 @@
         graphical="true"
         icon="@drawable/ic_extension_icon" />
 
+    <DataType
+        typeId="power-graphic"
+        description="3s power with avg, NP and power zone bar"
+        displayName="Power Monitor"
+        graphical="true"
+        icon="@drawable/ic_extension_icon" />
+
 </ExtensionInfo>
